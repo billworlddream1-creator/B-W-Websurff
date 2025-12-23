@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useStore } from './store';
 import { Category, User, SubscriptionTier, CreditPlan } from './types';
@@ -405,13 +406,36 @@ const App: React.FC = () => {
 
       {selectedPlan && <PaymentModal plan={selectedPlan} onClose={() => setSelectedPlan(null)} onSuccess={onPaymentSuccess} />}
       
-      <footer className="bg-white border-t border-slate-100 py-12 text-center">
-        <div className="flex justify-center items-center gap-6 mb-4">
-          <i className="fa-brands fa-twitter text-slate-300 hover:theme-text cursor-pointer transition-colors"></i>
-          <i className="fa-brands fa-github text-slate-300 hover:theme-text cursor-pointer transition-colors"></i>
-          <i className="fa-brands fa-discord text-slate-300 hover:theme-text cursor-pointer transition-colors"></i>
+      <footer className="bg-white border-t border-slate-100 py-12 px-8 relative">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
+          {/* Left Spacer for Desktop */}
+          <div className="flex-1 hidden md:block"></div>
+          
+          {/* Center Content */}
+          <div className="flex-1 text-center">
+            <div className="flex justify-center items-center gap-6 mb-4">
+              <i className="fa-brands fa-twitter text-slate-300 hover:theme-text cursor-pointer transition-colors"></i>
+              <i className="fa-brands fa-github text-slate-300 hover:theme-text cursor-pointer transition-colors"></i>
+              <i className="fa-brands fa-discord text-slate-300 hover:theme-text cursor-pointer transition-colors"></i>
+            </div>
+            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] whitespace-nowrap">
+              &copy; 2024 B&W WebSurff • The Ultimate Discovery Lab
+            </p>
+          </div>
+
+          {/* Right Content: WhatsApp Button */}
+          <div className="flex-1 flex justify-center md:justify-end">
+            <a 
+              href="https://wa.me/your-number-here" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 px-5 py-2.5 bg-[#25D366] text-white rounded-full font-bold text-xs shadow-xl hover:scale-105 transition-transform active:scale-95"
+            >
+              <i className="fa-brands fa-whatsapp text-lg"></i>
+              <span>Chat on WhatsApp</span>
+            </a>
+          </div>
         </div>
-        <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">&copy; 2024 B&W WebSurff • The Ultimate Discovery Lab</p>
       </footer>
     </div>
   );

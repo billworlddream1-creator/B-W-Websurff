@@ -1,14 +1,15 @@
 
 import React, { useState, useEffect } from 'react';
-import { CreditPlan, Category, SubscriptionTier } from '../types';
+import { CreditPlan, Category, SubscriptionTier, User } from '../types';
 
 interface PaymentModalProps {
   plan: CreditPlan;
   onClose: () => void;
   onSuccess: (siteDetails?: any) => void;
+  currentUser?: User | null;
 }
 
-const PaymentModal: React.FC<PaymentModalProps> = ({ plan, onClose, onSuccess }) => {
+const PaymentModal: React.FC<PaymentModalProps> = ({ plan, onClose, onSuccess, currentUser }) => {
   const [step, setStep] = useState<'pay' | 'burning' | 'details'>('pay');
   const [timer, setTimer] = useState(30);
   const [siteForm, setSiteForm] = useState({
@@ -32,7 +33,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ plan, onClose, onSuccess })
       }
     }
     return () => clearInterval(interval);
-  }, [step, timer, plan.tier]);
+  }, [step, timer, plan.tier, onSuccess]);
 
   const handlePaymentClick = () => {
     setStep('burning');
@@ -73,7 +74,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ plan, onClose, onSuccess })
 
         {step === 'burning' && (
           <div className="p-8 h-[400px] flex flex-col items-center justify-center relative overflow-hidden bg-orange-600">
-            {/* Burning Frame Animation */}
             <div className="absolute inset-0 z-0 animate-pulse opacity-50">
                <div className="w-full h-full bg-gradient-to-t from-red-600 via-orange-500 to-yellow-400" />
             </div>
@@ -83,15 +83,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ plan, onClose, onSuccess })
               <p className="text-xl font-bold opacity-80">Security Protocol Alpha: {timer}s</p>
               <p className="mt-8 text-sm max-w-xs mx-auto">Please do not refresh. Our neural nodes are authenticating your transaction in a secure burning environment.</p>
             </div>
-            
-            <style>{`
-              @keyframes flicker {
-                0% { box-shadow: 0 0 20px #ff4500; }
-                50% { box-shadow: 0 0 60px #ff8c00; }
-                100% { box-shadow: 0 0 20px #ff4500; }
-              }
-              .burning-box { animation: flicker 0.5s infinite; }
-            `}</style>
           </div>
         )}
 
@@ -103,32 +94,32 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ plan, onClose, onSuccess })
             <div className="space-y-4">
               <input 
                 placeholder="Website Name" 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-[var(--theme-primary)]"
                 value={siteForm.name}
                 onChange={e => setSiteForm({...siteForm, name: e.target.value})}
               />
               <input 
                 placeholder="Website URL (https://...)" 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-[var(--theme-primary)]"
                 value={siteForm.url}
                 onChange={e => setSiteForm({...siteForm, url: e.target.value})}
               />
               <select 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-[var(--theme-primary)]"
                 value={siteForm.category}
                 onChange={e => setSiteForm({...siteForm, category: e.target.value as Category})}
               >
                 {Object.values(Category).map(c => <option key={c} value={c}>{c}</option>)}
               </select>
               <input 
-                placeholder="Sample Image URL (Logo)" 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl"
+                placeholder="Logo Image URL" 
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-[var(--theme-primary)]"
                 value={siteForm.logo}
                 onChange={e => setSiteForm({...siteForm, logo: e.target.value})}
               />
               <textarea 
-                placeholder="Description (Max 100 chars)" 
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl"
+                placeholder="Catchy Description" 
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-[var(--theme-primary)] h-24"
                 value={siteForm.description}
                 onChange={e => setSiteForm({...siteForm, description: e.target.value})}
               />

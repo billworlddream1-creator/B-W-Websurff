@@ -68,6 +68,10 @@ export interface User {
   subscriptionTier: SubscriptionTier;
   shufflesToday: number;
   lastShuffleDate: string;
+  referralCode: string;
+  referredCount: number;
+  referredById?: string;
+  extraSlots: number; // Slots gained through referrals
 }
 
 export interface VoteRecord {

@@ -46,17 +46,17 @@ const SALUTATIONS = {
 
 const App: React.FC = () => {
   const { 
-    sites, ads, currentUser, setCurrentUser, votes, config, logs,
+    sites, ads, currentUser, setCurrentUser, signup, votes, config, logs,
     addVote, registerClick, updateConfig, addSite, deleteSite, 
     updateSite, addAd, updateAd, deleteAd, blockUser, users,
     registerShuffle, processPayment
   } = useStore();
 
-  const [view, setView] = useState<'home' | 'admin' | 'auth' | 'pricing' | 'stats'>('home');
+  const [view, setView] = useState<'home' | 'admin' | 'auth' | 'pricing' | 'stats' | 'referral'>('home');
   const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
   const [randomizedItems, setRandomizedItems] = useState<(any)[]>([]);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
-  const [authData, setAuthData] = useState({ username: '', password: '', email: '' });
+  const [authData, setAuthData] = useState({ username: '', password: '', email: '', referralCode: '' });
   const [selectedPlan, setSelectedPlan] = useState<CreditPlan | null>(null);
   const [promptMsg, setPromptMsg] = useState(PROMPT_MESSAGES[0]);
   const [salutation, setSalutation] = useState<string | null>(null);
@@ -146,20 +146,8 @@ const App: React.FC = () => {
 
   const handleSignup = () => {
     if (!config.isSignUpEnabled) return alert("Sign up disabled.");
-    const newUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
-      username: authData.username,
-      email: authData.email,
-      role: 'user',
-      createdAt: new Date().toISOString(),
-      isBlocked: false,
-      credits: 0,
-      subscriptionTier: SubscriptionTier.FREE,
-      shufflesToday: 0,
-      lastShuffleDate: new Date().toISOString().split('T')[0]
-    };
-    setCurrentUser(newUser);
-    showSalutation('signup', newUser.username);
+    const user = signup(authData.username, authData.email, authData.referralCode);
+    showSalutation('signup', user.username);
     setView('home');
   };
 
@@ -190,7 +178,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      {/* Salutation Alert */}
       {salutation && (
         <div className="bg-slate-900 text-white text-center py-2 px-4 animate-bounce fixed top-24 left-1/2 -translate-x-1/2 z-[60] rounded-full shadow-2xl border border-white/20 font-bold text-sm">
           {salutation}
@@ -198,7 +185,6 @@ const App: React.FC = () => {
       )}
 
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
-        {/* Pro-Subscription Header Strip */}
         {(!currentUser || currentUser.subscriptionTier === SubscriptionTier.FREE) && (
           <div className="theme-bg text-white text-[10px] font-black py-1 px-4 text-center uppercase tracking-widest overflow-hidden whitespace-nowrap">
             <div className="animate-pulse">
@@ -220,6 +206,7 @@ const App: React.FC = () => {
               <NavItem label="Discovery" target="home" icon="fa-house" />
               <NavItem label="Leaderboard" target="stats" icon="fa-chart-line" />
               <NavItem label="Buy Your Slot" target="pricing" icon="fa-gem" />
+              <NavItem label="Refer & Earn" target="referral" icon="fa-user-plus" />
               {isAdmin && <NavItem label="Admin" target="admin" icon="fa-unlock-keyhole" />}
             </div>
           </div>
@@ -260,12 +247,12 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Mobile Navigation */}
         {isMobileMenuOpen && (
           <div className="lg:hidden bg-white border-t border-slate-100 p-4 space-y-2 animate-in slide-in-from-top duration-300">
             <NavItem label="Discovery" target="home" icon="fa-house" />
             <NavItem label="Leaderboard" target="stats" icon="fa-chart-line" />
             <NavItem label="Buy Your Slot" target="pricing" icon="fa-gem" />
+            <NavItem label="Refer & Earn" target="referral" icon="fa-user-plus" />
             {isAdmin && <NavItem label="Admin" target="admin" icon="fa-unlock-keyhole" />}
             <div className="pt-2 border-t border-slate-50">
               <button 
@@ -312,12 +299,63 @@ const App: React.FC = () => {
                 <i className="fa-solid fa-rotate-right group-hover:rotate-180 transition-transform duration-500"></i>
                 EXPLORE MORE
               </button>
-              {currentUser?.subscriptionTier === SubscriptionTier.FREE && (
-                <p className="mt-6 text-xs font-bold text-slate-400 uppercase tracking-widest">
-                  Daily Shuffles: {currentUser.shufflesToday} / {config.plans.find(p => p.tier === SubscriptionTier.FREE)?.dailyShuffles}
-                </p>
-              )}
             </div>
+          </div>
+        )}
+
+        {view === 'referral' && (
+          <div className="max-w-4xl mx-auto px-4 py-16">
+            <div className="text-center mb-12">
+              <h2 className="text-5xl font-black text-slate-900 mb-4">Refer & <span className="theme-text">Earn Slots</span></h2>
+              <p className="text-slate-500 font-medium text-lg">Invite your friends. For every 10 referrals, you get 1 extra promoted slot and 50 points!</p>
+            </div>
+
+            {currentUser ? (
+              <div className="space-y-8">
+                <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 text-center">
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Your Referral Code</p>
+                  <div className="flex items-center justify-center gap-4">
+                    <span className="text-4xl font-black theme-text font-mono tracking-widest bg-slate-50 px-6 py-3 rounded-2xl border border-dashed border-slate-300">
+                      {currentUser.referralCode}
+                    </span>
+                    <button 
+                      onClick={() => navigator.clipboard.writeText(currentUser.referralCode)}
+                      className="p-4 theme-bg-soft theme-text rounded-2xl hover:scale-110 transition-transform"
+                    >
+                      <i className="fa-solid fa-copy"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-50 text-center">
+                    <p className="text-[10px] font-black text-slate-400 uppercase">Total Referrals</p>
+                    <p className="text-3xl font-black text-slate-900">{currentUser.referredCount}</p>
+                  </div>
+                  <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-50 text-center">
+                    <p className="text-[10px] font-black text-slate-400 uppercase">Extra Slots Earned</p>
+                    <p className="text-3xl font-black theme-text">{currentUser.extraSlots}</p>
+                  </div>
+                  <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-50 text-center">
+                    <p className="text-[10px] font-black text-slate-400 uppercase">Next Milestone</p>
+                    <p className="text-3xl font-black text-slate-400">{(Math.floor(currentUser.referredCount / 10) + 1) * 10}</p>
+                  </div>
+                </div>
+
+                <div className="bg-slate-100 rounded-full h-4 overflow-hidden">
+                  <div 
+                    className="theme-bg h-full transition-all duration-1000"
+                    style={{ width: `${(currentUser.referredCount % 10) * 10}%` }}
+                  ></div>
+                </div>
+                <p className="text-center text-xs font-bold text-slate-500">{10 - (currentUser.referredCount % 10)} more referrals needed for your next slot!</p>
+              </div>
+            ) : (
+              <div className="text-center bg-white p-12 rounded-3xl shadow-xl">
+                <p className="text-lg font-bold text-slate-600 mb-6">You need to be logged in to participate in the referral program.</p>
+                <button onClick={() => setView('auth')} className="px-8 py-4 theme-bg text-white rounded-2xl font-black">Login to Start Earning</button>
+              </div>
+            )}
           </div>
         )}
 
@@ -363,7 +401,7 @@ const App: React.FC = () => {
         )}
 
         {view === 'auth' && (
-          <div className="max-w-md mx-auto mt-20 px-4">
+          <div className="max-w-md mx-auto mt-20 px-4 pb-20">
             <div className="bg-white p-10 rounded-3xl shadow-2xl border border-slate-100">
               <div className="text-center mb-8">
                 <div className="w-16 h-16 theme-bg rounded-2xl flex items-center justify-center text-white text-2xl mx-auto mb-4 shadow-xl">
@@ -378,10 +416,16 @@ const App: React.FC = () => {
                   <input placeholder="Username or Email" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-xl focus:ring-2 focus:ring-[var(--theme-primary)] outline-none transition-all" value={authData.username} onChange={e => setAuthData({...authData, username: e.target.value})} />
                 </div>
                 {authMode === 'signup' && (
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Email Address</label>
-                    <input placeholder="hello@example.com" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-xl focus:ring-2 focus:ring-[var(--theme-primary)] outline-none transition-all" value={authData.email} onChange={e => setAuthData({...authData, email: e.target.value})} />
-                  </div>
+                  <>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Email Address</label>
+                      <input placeholder="hello@example.com" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-xl focus:ring-2 focus:ring-[var(--theme-primary)] outline-none transition-all" value={authData.email} onChange={e => setAuthData({...authData, email: e.target.value})} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Referral Code (Optional)</label>
+                      <input placeholder="XYZ123" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-xl focus:ring-2 focus:ring-[var(--theme-primary)] outline-none transition-all" value={authData.referralCode} onChange={e => setAuthData({...authData, referralCode: e.target.value})} />
+                    </div>
+                  </>
                 )}
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Secret Key</label>
@@ -406,12 +450,10 @@ const App: React.FC = () => {
 
       {selectedPlan && <PaymentModal plan={selectedPlan} onClose={() => setSelectedPlan(null)} onSuccess={onPaymentSuccess} />}
       
-      <footer className="bg-white border-t border-slate-100 py-12 px-8 relative">
+      <footer className="bg-white border-t border-slate-100 py-12 px-8 relative mt-auto">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
-          {/* Left Spacer for Desktop */}
           <div className="flex-1 hidden md:block"></div>
           
-          {/* Center Content */}
           <div className="flex-1 text-center">
             <div className="flex justify-center items-center gap-6 mb-4">
               <i className="fa-brands fa-twitter text-slate-300 hover:theme-text cursor-pointer transition-colors"></i>
@@ -423,7 +465,6 @@ const App: React.FC = () => {
             </p>
           </div>
 
-          {/* Right Content: WhatsApp Button */}
           <div className="flex-1 flex justify-center md:justify-end">
             <a 
               href="https://wa.me/your-number-here" 

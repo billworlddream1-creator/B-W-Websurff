@@ -13,6 +13,8 @@ const STORAGE_KEYS = {
   LOGS: 'websurfer_logs'
 };
 
+const generateReferralCode = () => Math.random().toString(36).substring(2, 8).toUpperCase();
+
 export const useStore = () => {
   const [sites, setSites] = useState<SiteLink[]>([]);
   const [ads, setAds] = useState<Ad[]>([]);
@@ -59,7 +61,10 @@ export const useStore = () => {
         credits: 10000,
         subscriptionTier: SubscriptionTier.GOLD,
         shufflesToday: 0,
-        lastShuffleDate: new Date().toISOString().split('T')[0]
+        lastShuffleDate: new Date().toISOString().split('T')[0],
+        referralCode: 'ADMINX',
+        referredCount: 0,
+        extraSlots: 0
       };
       setUsers([defaultAdmin]);
     }
@@ -111,13 +116,56 @@ export const useStore = () => {
     return true;
   };
 
+  const signup = (username: string, email: string, referralCode?: string) => {
+    const referrer = users.find(u => u.referralCode === referralCode?.toUpperCase());
+    
+    const newUser: User = {
+      id: Math.random().toString(36).substr(2, 9),
+      username,
+      email,
+      role: 'user',
+      createdAt: new Date().toISOString(),
+      isBlocked: false,
+      credits: 0,
+      subscriptionTier: SubscriptionTier.FREE,
+      shufflesToday: 0,
+      lastShuffleDate: new Date().toISOString().split('T')[0],
+      referralCode: generateReferralCode(),
+      referredCount: 0,
+      referredById: referrer?.id,
+      extraSlots: 0
+    };
+
+    let updatedUsers = [...users, newUser];
+
+    if (referrer) {
+      updatedUsers = updatedUsers.map(u => {
+        if (u.id === referrer.id) {
+          const newReferredCount = u.referredCount + 1;
+          const newExtraSlots = Math.floor(newReferredCount / 10);
+          return {
+            ...u,
+            referredCount: newReferredCount,
+            extraSlots: newExtraSlots,
+            credits: u.credits + (newReferredCount % 10 === 0 ? 50 : 0) // Bonus credits for every 10
+          };
+        }
+        return u;
+      });
+      logActivity(referrer.id, `Referred new user: ${username}`);
+    }
+
+    setUsers(updatedUsers);
+    setCurrentUser(newUser);
+    return newUser;
+  };
+
   const processPayment = (plan: CreditPlan) => {
     if (!currentUser) return;
     const updatedUser: User = {
       ...currentUser,
       credits: currentUser.credits + plan.credits,
       subscriptionTier: plan.tier,
-      // Reset shuffles on upgrade? Optional, but let's keep it generous
       shufflesToday: 0,
       lastShuffleDate: new Date().toISOString().split('T')[0]
     };
@@ -171,15 +219,12 @@ export const useStore = () => {
       likes: 0,
       dislikes: 0,
       clicks: 0,
-      enabled: true
+      enabled: true,
+      ownerId: currentUser?.id
     };
     setSites(prev => [newSite, ...prev]);
     if (currentUser) {
       logActivity(currentUser.id, `Added new site: ${site.name}`);
-      // Deduct credits if it's a paid listing
-      if (site.isPaid && currentUser.role !== 'admin') {
-         // Credits handled during plan purchase usually, but could deduct per site here
-      }
     }
   };
 
@@ -214,7 +259,7 @@ export const useStore = () => {
 
   return {
     sites, ads, users, votes, config, currentUser, logs,
-    setCurrentUser, addVote, registerClick, updateConfig, 
+    setCurrentUser, signup, addVote, registerClick, updateConfig, 
     updateSite, deleteSite, addSite, addAd, updateAd, deleteAd, 
     blockUser, registerShuffle, processPayment
   };

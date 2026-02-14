@@ -8,6 +8,7 @@ interface AdminPanelProps {
   ads: Ad[];
   users: User[];
   config: AdminConfig;
+  currentUser: User | null;
   onUpdateConfig: (conf: Partial<AdminConfig>) => void;
   onAddSite: (site: any) => void;
   onDeleteSite: (id: string) => void;
@@ -16,17 +17,34 @@ interface AdminPanelProps {
   onUpdateAd: (ad: Ad) => void;
   onDeleteAd: (id: string) => void;
   onBlockUser: (id: string) => void;
+  onAddUser: (user: Partial<User>) => void;
+  onDeleteUser: (id: string) => void;
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({
-  sites, ads, users, config, onUpdateConfig, onAddSite, onDeleteSite, onUpdateSite, onAddAd, onUpdateAd, onDeleteAd, onBlockUser
+  sites, ads, users, config, currentUser, onUpdateConfig, onAddSite, onDeleteSite, onUpdateSite, onAddAd, onUpdateAd, onDeleteAd, onBlockUser, onAddUser, onDeleteUser
 }) => {
   const [activeTab, setActiveTab] = useState<'stats' | 'sites' | 'users' | 'ads' | 'plans' | 'logs'>('stats');
+  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  const [newUserForm, setNewUserForm] = useState({
+    username: '',
+    email: '',
+    role: 'user' as 'user' | 'admin',
+    subscriptionTier: SubscriptionTier.FREE
+  });
   const { logs } = useStore();
 
   const handlePriceUpdate = (planId: string, newPrice: number) => {
     const updatedPlans = config.plans.map(p => p.id === planId ? { ...p, price: newPrice } : p);
     onUpdateConfig({ plans: updatedPlans });
+  };
+
+  const handleCreateUser = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserForm.username || !newUserForm.email) return;
+    onAddUser(newUserForm);
+    setNewUserForm({ username: '', email: '', role: 'user', subscriptionTier: SubscriptionTier.FREE });
+    setIsAddUserOpen(false);
   };
 
   return (
@@ -45,7 +63,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           </nav>
         </div>
 
-        <div className="flex-1 bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
+        <div className="flex-1 bg-white border border-slate-200 rounded-3xl p-8 shadow-sm min-h-[600px]">
           {activeTab === 'stats' && (
             <div className="space-y-8">
               <h2 className="text-3xl font-black text-slate-900">Dashboard</h2>
@@ -114,19 +132,100 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
           {activeTab === 'users' && (
             <div className="space-y-6">
-              <h2 className="text-3xl font-black text-slate-900">Users</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-3xl font-black text-slate-900">Users</h2>
+                <button 
+                  onClick={() => setIsAddUserOpen(!isAddUserOpen)}
+                  className="px-4 py-2 theme-bg text-white rounded-xl text-xs font-black shadow-lg hover:scale-105 transition-all"
+                >
+                  <i className={`fa-solid ${isAddUserOpen ? 'fa-minus' : 'fa-plus'} mr-2`}></i>
+                  {isAddUserOpen ? 'Cancel' : 'Add New User'}
+                </button>
+              </div>
+
+              {isAddUserOpen && (
+                <form onSubmit={handleCreateUser} className="bg-slate-50 p-6 rounded-2xl border border-slate-100 animate-in slide-in-from-top duration-300">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input 
+                      placeholder="Username" 
+                      className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--theme-primary)]"
+                      value={newUserForm.username}
+                      onChange={e => setNewUserForm({...newUserForm, username: e.target.value})}
+                      required
+                    />
+                    <input 
+                      placeholder="Email Address" 
+                      type="email"
+                      className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--theme-primary)]"
+                      value={newUserForm.email}
+                      onChange={e => setNewUserForm({...newUserForm, email: e.target.value})}
+                      required
+                    />
+                    <select 
+                      className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none"
+                      value={newUserForm.role}
+                      onChange={e => setNewUserForm({...newUserForm, role: e.target.value as any})}
+                    >
+                      <option value="user">Standard User</option>
+                      <option value="admin">Administrator</option>
+                    </select>
+                    <select 
+                      className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none"
+                      value={newUserForm.subscriptionTier}
+                      onChange={e => setNewUserForm({...newUserForm, subscriptionTier: e.target.value as SubscriptionTier})}
+                    >
+                      {Object.values(SubscriptionTier).map(tier => <option key={tier} value={tier}>{tier} Tier</option>)}
+                    </select>
+                  </div>
+                  <button type="submit" className="mt-4 w-full py-2 bg-slate-900 text-white rounded-lg text-xs font-black hover:bg-slate-800 transition-colors">
+                    Create User Account
+                  </button>
+                </form>
+              )}
+
               <div className="space-y-2">
                 {users.map(u => (
-                  <div key={u.id} className="p-4 border border-slate-100 rounded-2xl flex items-center justify-between">
-                    <div>
-                      <h3 className="font-black text-slate-800 text-sm">{u.username} <span className="text-[10px] theme-bg-soft theme-text px-2 py-0.5 rounded ml-2">{u.subscriptionTier}</span></h3>
-                      <p className="text-[10px] text-slate-400">{u.email}</p>
+                  <div key={u.id} className="p-4 border border-slate-100 rounded-2xl flex items-center justify-between hover:border-slate-300 transition-colors bg-white">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-black ${u.role === 'admin' ? 'bg-slate-900' : 'theme-bg'}`}>
+                        {u.username[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <h3 className="font-black text-slate-800 text-sm">
+                          {u.username} 
+                          <span className="text-[9px] theme-bg-soft theme-text px-2 py-0.5 rounded ml-2 font-black uppercase tracking-tighter">{u.subscriptionTier}</span>
+                          {u.role === 'admin' && <span className="text-[9px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded ml-2 font-black uppercase">ADMIN</span>}
+                        </h3>
+                        <p className="text-[10px] text-slate-400 font-medium">{u.email}</p>
+                      </div>
                     </div>
-                    {u.role !== 'admin' && (
-                      <button onClick={() => onBlockUser(u.id)} className={`px-4 py-1.5 rounded-lg font-black text-[10px] border ${u.isBlocked ? 'bg-green-600 text-white border-green-600' : 'bg-white text-red-500 border-red-100'}`}>
-                        {u.isBlocked ? 'Unlock' : 'Block'}
-                      </button>
-                    )}
+                    
+                    <div className="flex items-center gap-2">
+                      {u.role !== 'admin' && (
+                        <>
+                          <button 
+                            onClick={() => onBlockUser(u.id)} 
+                            className={`px-4 py-1.5 rounded-lg font-black text-[10px] border ${u.isBlocked ? 'bg-green-600 text-white border-green-600' : 'bg-white text-orange-500 border-orange-100 hover:bg-orange-50'}`}
+                          >
+                            {u.isBlocked ? 'Unlock' : 'Block'}
+                          </button>
+                          <button 
+                            onClick={() => {
+                              if (window.confirm(`Permanently delete user "${u.username}" and all their data?`)) {
+                                onDeleteUser(u.id);
+                              }
+                            }} 
+                            className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                            title="Delete User"
+                          >
+                            <i className="fa-solid fa-trash-can"></i>
+                          </button>
+                        </>
+                      )}
+                      {u.id === currentUser?.id && (
+                         <span className="text-[10px] text-slate-300 font-bold uppercase italic mr-2">You</span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

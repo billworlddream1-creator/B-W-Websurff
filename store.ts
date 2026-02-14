@@ -13,6 +13,9 @@ const STORAGE_KEYS = {
   LOGS: 'websurfer_logs'
 };
 
+const PAYOUT_THRESHOLD = 5.00;
+const CLICK_REWARD_RATE = 0.00001; // $0.01 per 1000 clicks
+
 const generateReferralCode = () => Math.random().toString(36).substring(2, 8).toUpperCase();
 
 export const useStore = () => {
@@ -40,7 +43,8 @@ export const useStore = () => {
 
     if (storedSites) setSites(JSON.parse(storedSites));
     else {
-      const initialSeed = [...INITIAL_SITES, ...generateMockLinks(995)];
+      // Generate exactly 1000 sites (3 initial + 997 mock)
+      const initialSeed = [...INITIAL_SITES, ...generateMockLinks(997)];
       setSites(initialSeed);
       localStorage.setItem(STORAGE_KEYS.SITES, JSON.stringify(initialSeed));
     }
@@ -64,7 +68,10 @@ export const useStore = () => {
         lastShuffleDate: new Date().toISOString().split('T')[0],
         referralCode: 'ADMINX',
         referredCount: 0,
-        extraSlots: 0
+        extraSlots: 0,
+        balance: 0,
+        totalEarnings: 0,
+        payoutThreshold: PAYOUT_THRESHOLD
       };
       setUsers([defaultAdmin]);
     }
@@ -84,7 +91,7 @@ export const useStore = () => {
 
   const logActivity = (userId: string, action: string) => {
     const newLog: ActivityLog = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 9),
       userId,
       action,
       timestamp: new Date().toISOString()
@@ -120,7 +127,7 @@ export const useStore = () => {
     const referrer = users.find(u => u.referralCode === referralCode?.toUpperCase());
     
     const newUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 9),
       username,
       email,
       role: 'user',
@@ -133,7 +140,10 @@ export const useStore = () => {
       referralCode: generateReferralCode(),
       referredCount: 0,
       referredById: referrer?.id,
-      extraSlots: 0
+      extraSlots: 0,
+      balance: 0,
+      totalEarnings: 0,
+      payoutThreshold: PAYOUT_THRESHOLD
     };
 
     let updatedUsers = [...users, newUser];
@@ -147,7 +157,7 @@ export const useStore = () => {
             ...u,
             referredCount: newReferredCount,
             extraSlots: newExtraSlots,
-            credits: u.credits + (newReferredCount % 10 === 0 ? 50 : 0) // Bonus credits for every 10
+            credits: u.credits + (newReferredCount % 10 === 0 ? 50 : 0)
           };
         }
         return u;
@@ -158,6 +168,70 @@ export const useStore = () => {
     setUsers(updatedUsers);
     setCurrentUser(newUser);
     return newUser;
+  };
+
+  const registerClick = (linkId: string) => {
+    const site = sites.find(s => s.id === linkId);
+    if (!site) return;
+
+    setSites(prev => prev.map(s => s.id === linkId ? { ...s, clicks: s.clicks + 1 } : s));
+
+    if (site.ownerId) {
+      setUsers(prevUsers => prevUsers.map(user => {
+        if (user.id === site.ownerId && user.subscriptionTier !== SubscriptionTier.FREE) {
+          const earningAmount = CLICK_REWARD_RATE;
+          const updatedUser = {
+            ...user,
+            balance: (user.balance || 0) + earningAmount,
+            totalEarnings: (user.totalEarnings || 0) + earningAmount
+          };
+          if (currentUser?.id === user.id) {
+             setCurrentUser(updatedUser);
+          }
+          return updatedUser;
+        }
+        return user;
+      }));
+    }
+
+    if (currentUser) logActivity(currentUser.id, `Visited site ${linkId}`);
+  };
+
+  const updateProfile = (updates: Partial<User>) => {
+    if (!currentUser) return;
+    const updatedUser = { ...currentUser, ...updates };
+    setCurrentUser(updatedUser);
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+    logActivity(currentUser.id, `Updated profile details`);
+  };
+
+  const addUser = (userData: Partial<User>) => {
+    const newUser: User = {
+      id: Math.random().toString(36).substring(2, 9),
+      username: userData.username || 'User',
+      email: userData.email || '',
+      role: userData.role || 'user',
+      createdAt: new Date().toISOString(),
+      isBlocked: false,
+      credits: userData.credits || 0,
+      subscriptionTier: userData.subscriptionTier || SubscriptionTier.FREE,
+      shufflesToday: 0,
+      lastShuffleDate: new Date().toISOString().split('T')[0],
+      referralCode: generateReferralCode(),
+      referredCount: 0,
+      extraSlots: 0,
+      balance: 0,
+      totalEarnings: 0,
+      payoutThreshold: PAYOUT_THRESHOLD
+    };
+    setUsers(prev => [...prev, newUser]);
+    if (currentUser) logActivity(currentUser.id, `Admin added user: ${newUser.username}`);
+  };
+
+  const deleteUser = (userId: string) => {
+    setUsers(prev => prev.filter(u => u.id !== userId));
+    setSites(prev => prev.filter(s => s.ownerId !== userId));
+    if (currentUser) logActivity(currentUser.id, `Admin deleted user ID: ${userId}`);
   };
 
   const processPayment = (plan: CreditPlan) => {
@@ -206,15 +280,10 @@ export const useStore = () => {
     logActivity(currentUser.id, `${type}d site ${linkId}`);
   };
 
-  const registerClick = (linkId: string) => {
-    setSites(prev => prev.map(s => s.id === linkId ? { ...s, clicks: s.clicks + 1 } : s));
-    if (currentUser) logActivity(currentUser.id, `Visited site ${linkId}`);
-  };
-
   const addSite = (site: Partial<SiteLink>) => {
     const newSite: SiteLink = {
       ...site as SiteLink,
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 9),
       createdAt: new Date().toISOString(),
       likes: 0,
       dislikes: 0,
@@ -241,7 +310,7 @@ export const useStore = () => {
   };
 
   const addAd = (ad: any) => {
-    const newAd: Ad = { ...ad, id: 'ad-' + Math.random().toString(36).substr(2, 9), clicks: 0, impressions: 0 };
+    const newAd: Ad = { ...ad, id: 'ad-' + Math.random().toString(36).substring(2, 9), clicks: 0, impressions: 0 };
     setAds(prev => [...prev, newAd]);
   };
 
@@ -261,6 +330,6 @@ export const useStore = () => {
     sites, ads, users, votes, config, currentUser, logs,
     setCurrentUser, signup, addVote, registerClick, updateConfig, 
     updateSite, deleteSite, addSite, addAd, updateAd, deleteAd, 
-    blockUser, registerShuffle, processPayment
+    blockUser, registerShuffle, processPayment, addUser, deleteUser, updateProfile
   };
 };

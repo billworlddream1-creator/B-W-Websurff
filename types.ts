@@ -71,7 +71,14 @@ export interface User {
   referralCode: string;
   referredCount: number;
   referredById?: string;
-  extraSlots: number; // Slots gained through referrals
+  extraSlots: number; 
+  // Financial & Profile Extension
+  balance: number;
+  totalEarnings: number;
+  payoutThreshold: number;
+  paymentDetails?: string;
+  profileImage?: string;
+  displayName?: string;
 }
 
 export interface VoteRecord {

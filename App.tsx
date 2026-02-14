@@ -7,6 +7,7 @@ import AdCard from './components/AdCard';
 import AdminPanel from './components/AdminPanel';
 import AnalysisSection from './components/AnalysisSection';
 import PaymentModal from './components/PaymentModal';
+import CreatorDashboard from './components/CreatorDashboard';
 
 const THEME_COLORS = [
   { primary: '#2563eb', secondary: '#dbeafe' },
@@ -24,9 +25,10 @@ const THEME_COLORS = [
 const PROMPT_MESSAGES = [
   "🚀 Free users get limited shuffles. Go Unlimited!",
   "💎 Want your site at the top? Buy your slot now!",
-  "🌟 Discover 10,000+ hidden corners of the web.",
+  "🌟 Discover 1,000+ hidden corners of the web.",
   "✨ Upgrade to feature your project to our community!",
-  "🔥 Get the Gold badge and unlock priority discovery."
+  "🔥 Get the Gold badge and unlock priority discovery.",
+  "💰 Paid users earn real cash from every click!"
 ];
 
 const SALUTATIONS = {
@@ -46,13 +48,13 @@ const SALUTATIONS = {
 
 const App: React.FC = () => {
   const { 
-    sites, ads, currentUser, setCurrentUser, signup, votes, config, logs,
+    sites, ads, currentUser, setCurrentUser, signup, votes, config,
     addVote, registerClick, updateConfig, addSite, deleteSite, 
     updateSite, addAd, updateAd, deleteAd, blockUser, users,
-    registerShuffle, processPayment
+    registerShuffle, processPayment, addUser, deleteUser, updateProfile
   } = useStore();
 
-  const [view, setView] = useState<'home' | 'admin' | 'auth' | 'pricing' | 'stats' | 'referral'>('home');
+  const [view, setView] = useState<'home' | 'admin' | 'auth' | 'pricing' | 'stats' | 'referral' | 'creator'>('home');
   const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
   const [randomizedItems, setRandomizedItems] = useState<(any)[]>([]);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
@@ -61,6 +63,7 @@ const App: React.FC = () => {
   const [promptMsg, setPromptMsg] = useState(PROMPT_MESSAGES[0]);
   const [salutation, setSalutation] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isShuffling, setIsShuffling] = useState(false);
   
   const lastThemeIndex = useRef<number>(-1);
 
@@ -84,49 +87,58 @@ const App: React.FC = () => {
       return;
     }
 
-    if (view !== 'home') setView('home');
-
-    applyRandomTheme();
-    setPromptMsg(PROMPT_MESSAGES[Math.floor(Math.random() * PROMPT_MESSAGES.length)]);
-
-    let filteredSites = sites.filter(s => s.enabled);
-    if (selectedCategory !== 'All') {
-      filteredSites = filteredSites.filter(s => s.category === selectedCategory);
-    }
-
-    const paidSites = filteredSites.filter(s => s.isPaid).sort(() => 0.5 - Math.random());
-    const normalSites = filteredSites.filter(s => !s.isPaid).sort(() => 0.5 - Math.random());
+    setIsShuffling(true);
     
-    const combined = [...paidSites, ...normalSites].slice(0, config.maxLinksPerPage);
-    
-    const activeAds = ads.filter(a => a.enabled);
-    const result: any[] = [];
-    
-    combined.forEach((site, index) => {
-      result.push({ type: 'site', data: site });
-      if ((index + 1) % 8 === 0 && activeAds.length > 0) {
-        const randomAd = activeAds[Math.floor(Math.random() * activeAds.length)];
-        result.push({ type: 'ad', data: randomAd });
+    setTimeout(() => {
+      if (view !== 'home' && view !== 'creator' && view !== 'stats') {
+        setView('home');
       }
-    });
 
-    setRandomizedItems(result);
+      applyRandomTheme();
+      setPromptMsg(PROMPT_MESSAGES[Math.floor(Math.random() * PROMPT_MESSAGES.length)]);
+
+      let filteredSites = sites.filter(s => s.enabled);
+      if (selectedCategory !== 'All') {
+        filteredSites = filteredSites.filter(s => s.category === selectedCategory);
+      }
+
+      // Randomize selection from 1000 sites
+      const paidSites = filteredSites.filter(s => s.isPaid).sort(() => 0.5 - Math.random());
+      const normalSites = filteredSites.filter(s => !s.isPaid).sort(() => 0.5 - Math.random());
+      
+      const combined = [...paidSites, ...normalSites].slice(0, config.maxLinksPerPage);
+      
+      const activeAds = ads.filter(a => a.enabled);
+      const result: any[] = [];
+      
+      combined.forEach((site, index) => {
+        result.push({ type: 'site', data: site });
+        if ((index + 1) % 8 === 0 && activeAds.length > 0) {
+          const randomAd = activeAds[Math.floor(Math.random() * activeAds.length)];
+          result.push({ type: 'ad', data: randomAd });
+        }
+      });
+
+      setRandomizedItems(result);
+      setIsShuffling(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 400);
   }, [sites, ads, selectedCategory, config.maxLinksPerPage, applyRandomTheme, registerShuffle, view]);
 
   useEffect(() => {
     if (!currentUser || currentUser.subscriptionTier === SubscriptionTier.FREE) return;
     
     const interval = setInterval(() => {
-      if (view === 'home') shuffle();
+      if (view === 'home' && !isShuffling) shuffle();
     }, 25000);
     return () => clearInterval(interval);
-  }, [currentUser, view, shuffle]);
+  }, [currentUser, view, shuffle, isShuffling]);
 
   useEffect(() => {
     if (sites.length > 0 && randomizedItems.length === 0) {
       shuffle();
     }
-  }, [sites, shuffle, randomizedItems.length]);
+  }, [sites.length, shuffle, randomizedItems.length]);
 
   const showSalutation = (type: 'login' | 'signup', name: string) => {
     const randomMsg = SALUTATIONS[type][Math.floor(Math.random() * SALUTATIONS[type].length)];
@@ -158,11 +170,12 @@ const App: React.FC = () => {
         addSite(siteDetails);
       }
       setSelectedPlan(null);
-      setView('home');
+      setView('creator');
     }
   };
 
   const isAdmin = currentUser?.role === 'admin';
+  const userSites = sites.filter(s => s.ownerId === currentUser?.id);
 
   const NavItem = ({ label, target, icon }: { label: string, target: any, icon: string }) => (
     <button 
@@ -206,29 +219,37 @@ const App: React.FC = () => {
               <NavItem label="Discovery" target="home" icon="fa-house" />
               <NavItem label="Leaderboard" target="stats" icon="fa-chart-line" />
               <NavItem label="Buy Your Slot" target="pricing" icon="fa-gem" />
+              <NavItem label="Creator Hub" target="creator" icon="fa-wallet" />
               <NavItem label="Refer & Earn" target="referral" icon="fa-user-plus" />
               {isAdmin && <NavItem label="Admin" target="admin" icon="fa-unlock-keyhole" />}
             </div>
           </div>
 
           <div className="flex items-center gap-4">
-            <button 
-              onClick={shuffle}
-              className="hidden md:flex items-center gap-2 px-5 py-2.5 theme-bg text-white rounded-xl font-bold text-sm shadow-lg hover:scale-[1.05] active:scale-95 transition-all"
-            >
-              <i className="fa-solid fa-shuffle"></i>
-              Surprise Me
-            </button>
+            {view === 'home' && (
+              <button 
+                onClick={shuffle}
+                disabled={isShuffling}
+                className="hidden md:flex items-center gap-2 px-5 py-2.5 theme-bg text-white rounded-xl font-bold text-sm shadow-lg hover:scale-[1.05] active:scale-95 transition-all disabled:opacity-50"
+              >
+                <i className={`fa-solid ${isShuffling ? 'fa-spinner fa-spin' : 'fa-shuffle'}`}></i>
+                {isShuffling ? 'Exploring...' : 'Surprise Me'}
+              </button>
+            )}
 
             <div className="h-8 w-px bg-slate-200 hidden md:block"></div>
 
             {currentUser ? (
               <div className="flex items-center gap-4">
-                <div className="flex flex-col items-end leading-none">
-                  <span className="text-sm font-black text-slate-900">{currentUser.username}</span>
-                  <span className="text-[10px] theme-text font-black uppercase tracking-tighter mt-1">{currentUser.credits} Points</span>
+                <div className="flex flex-col items-end leading-none cursor-pointer" onClick={() => setView('creator')}>
+                  <span className="text-sm font-black text-slate-900">{currentUser.displayName || currentUser.username}</span>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="text-[10px] theme-text font-black uppercase tracking-tighter">${(currentUser.balance || 0).toFixed(2)}</span>
+                    <span className="text-[10px] text-slate-300 font-bold">•</span>
+                    <span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">{currentUser.credits} Pts</span>
+                  </div>
                 </div>
-                <button onClick={() => setCurrentUser(null)} className="p-2 text-slate-400 hover:text-red-500 transition-colors">
+                <button onClick={() => { setCurrentUser(null); setView('home'); }} className="p-2 text-slate-400 hover:text-red-500 transition-colors">
                   <i className="fa-solid fa-right-from-bracket"></i>
                 </button>
               </div>
@@ -252,14 +273,16 @@ const App: React.FC = () => {
             <NavItem label="Discovery" target="home" icon="fa-house" />
             <NavItem label="Leaderboard" target="stats" icon="fa-chart-line" />
             <NavItem label="Buy Your Slot" target="pricing" icon="fa-gem" />
+            <NavItem label="Creator Hub" target="creator" icon="fa-wallet" />
             <NavItem label="Refer & Earn" target="referral" icon="fa-user-plus" />
             {isAdmin && <NavItem label="Admin" target="admin" icon="fa-unlock-keyhole" />}
             <div className="pt-2 border-t border-slate-50">
               <button 
                 onClick={shuffle}
+                disabled={isShuffling}
                 className="w-full flex items-center justify-center gap-2 px-5 py-3 theme-bg text-white rounded-xl font-bold text-sm shadow-md"
               >
-                <i className="fa-solid fa-shuffle"></i>
+                <i className={`fa-solid ${isShuffling ? 'fa-spinner fa-spin' : 'fa-shuffle'}`}></i>
                 Shuffle Sites
               </button>
             </div>
@@ -271,20 +294,26 @@ const App: React.FC = () => {
         {view === 'home' && (
           <div className="max-w-7xl mx-auto px-4 py-8">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
-              <div>
+              <div className={isShuffling ? 'opacity-50 transition-opacity' : ''}>
                 <h1 className="text-4xl font-black text-slate-900 leading-tight">
                   Endless <span className="theme-text">Discovery</span>
                 </h1>
-                <p className="text-slate-500 text-sm mt-1 font-medium">Explore the best of the web, randomized just for you.</p>
+                <p className="text-slate-500 text-sm mt-1 font-medium">Explore 1,000+ handpicked resources, randomized just for you.</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 {['All', ...Object.values(Category)].map(cat => (
-                  <button key={cat} onClick={() => setSelectedCategory(cat as any)} className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${selectedCategory === cat ? 'theme-bg text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-slate-300'}`}>{cat}</button>
+                  <button 
+                    key={cat} 
+                    onClick={() => setSelectedCategory(cat as any)} 
+                    className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${selectedCategory === cat ? 'theme-bg text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-slate-300'}`}
+                  >
+                    {cat}
+                  </button>
                 ))}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 transition-all duration-500 ${isShuffling ? 'opacity-0 translate-y-4 pointer-events-none' : 'opacity-100 translate-y-0'}`}>
               {randomizedItems.map((item, idx) => (
                 item.type === 'site' ? (
                   <LinkCard key={`s-${item.data.id}-${idx}`} site={item.data} currentUser={currentUser} userVote={votes.find(v => v.userId === currentUser?.id && v.linkId === item.data.id)} onVote={addVote} onClick={registerClick} />
@@ -295,11 +324,31 @@ const App: React.FC = () => {
             </div>
 
             <div className="mt-16 text-center">
-              <button onClick={shuffle} className="group px-12 py-5 theme-bg text-white rounded-2xl font-black text-xl shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-4 mx-auto">
-                <i className="fa-solid fa-rotate-right group-hover:rotate-180 transition-transform duration-500"></i>
-                EXPLORE MORE
+              <button 
+                onClick={shuffle} 
+                disabled={isShuffling}
+                className="group px-12 py-5 theme-bg text-white rounded-2xl font-black text-xl shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-4 mx-auto disabled:opacity-50"
+              >
+                <i className={`fa-solid ${isShuffling ? 'fa-spinner fa-spin' : 'fa-rotate-right group-hover:rotate-180'} transition-transform duration-500`}></i>
+                {isShuffling ? 'EXPLORING THE WEB...' : 'EXPLORE MORE'}
               </button>
+              <p className="mt-4 text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">1,000+ Potential Destintations</p>
             </div>
+          </div>
+        )}
+
+        {view === 'creator' && currentUser && (
+          <CreatorDashboard user={currentUser} onUpdate={updateProfile} userSites={userSites} />
+        )}
+        
+        {view === 'creator' && !currentUser && (
+          <div className="max-w-md mx-auto py-20 text-center">
+            <i className="fa-solid fa-lock text-6xl text-slate-200 mb-6"></i>
+            <h2 className="text-3xl font-black text-slate-900 mb-4">Creator Hub</h2>
+            <p className="text-slate-500 mb-8 font-medium">Sign in to access your wallet, manage your site listings, and track your earnings.</p>
+            <button onClick={() => setView('auth')} className="px-8 py-4 theme-bg text-white rounded-2xl font-black shadow-xl">
+              Sign In to Hub
+            </button>
           </div>
         )}
 
@@ -319,7 +368,10 @@ const App: React.FC = () => {
                       {currentUser.referralCode}
                     </span>
                     <button 
-                      onClick={() => navigator.clipboard.writeText(currentUser.referralCode)}
+                      onClick={() => {
+                        navigator.clipboard.writeText(currentUser.referralCode);
+                        alert("Referral code copied!");
+                      }}
                       className="p-4 theme-bg-soft theme-text rounded-2xl hover:scale-110 transition-transform"
                     >
                       <i className="fa-solid fa-copy"></i>
@@ -379,6 +431,7 @@ const App: React.FC = () => {
                     <li className="flex items-center gap-3 text-slate-600 font-bold"><i className="fa-solid fa-check-double theme-text"></i> {plan.credits} Listing Points</li>
                     <li className="flex items-center gap-3 text-slate-600 font-bold"><i className="fa-solid fa-check-double theme-text"></i> {plan.dailyShuffles === 1000 ? 'Unlimited' : `${plan.dailyShuffles} Daily`} Shuffles</li>
                     <li className="flex items-center gap-3 text-slate-600 font-bold"><i className="fa-solid fa-check-double theme-text"></i> Promoted Listing {plan.maxSites > 0 ? `(Max ${plan.maxSites})` : 'N/A'}</li>
+                    <li className="flex items-center gap-3 text-slate-600 font-bold"><i className="fa-solid fa-money-bill-trend-up theme-text"></i> Monetize Your Site Clicks</li>
                     <li className="flex items-center gap-3 text-slate-600 font-bold"><i className="fa-solid fa-check-double theme-text"></i> Priority Feature Access</li>
                   </ul>
                   <button 
@@ -397,7 +450,23 @@ const App: React.FC = () => {
         )}
 
         {view === 'admin' && isAdmin && (
-          <AdminPanel sites={sites} ads={ads} users={users} config={config} onUpdateConfig={updateConfig} onAddSite={addSite} onDeleteSite={deleteSite} onUpdateSite={updateSite} onAddAd={addAd} onUpdateAd={updateAd} onDeleteAd={deleteAd} onBlockUser={blockUser} />
+          <AdminPanel 
+            sites={sites} 
+            ads={ads} 
+            users={users} 
+            config={config} 
+            currentUser={currentUser}
+            onUpdateConfig={updateConfig} 
+            onAddSite={addSite} 
+            onDeleteSite={deleteSite} 
+            onUpdateSite={updateSite} 
+            onAddAd={addAd} 
+            onUpdateAd={updateAd} 
+            onDeleteAd={deleteAd} 
+            onBlockUser={blockUser}
+            onAddUser={addUser}
+            onDeleteUser={deleteUser}
+          />
         )}
 
         {view === 'auth' && (
